@@ -66,9 +66,9 @@ int main()
     CONNECT(gThread.TICK, Loop);
 
     gThread.Start();
+    gServer.Open(8554);
     gThread.RegisterWaitable(&gServer);
     CONNECT(gServer.CLIENT_CONNECTED, OnClientConnected);
-    gServer.Open(8554);
 
     gThread.Join();
 }

@@ -41,7 +41,7 @@ public:
     void    InitTransport(u_short aRtpPort, u_short aRtcpPort);
 
     bool isTcpTransport() { return m_TcpTransport; }
-    SOCKET& getClient() { return m_RtspClient; }
+    TCPSOCKET& getClient() { return m_RtspClient; }
     
     uint16_t getRtpClientPort() { return m_RtpClientPort; }
 private:
@@ -58,7 +58,7 @@ private:
     // global session state parameters
     int m_RtspSessionID;
     WiFiClient m_Client;
-    SOCKET m_RtspClient;                                      // RTSP socket of that session
+    TCPSOCKET m_RtspClient;                                      // RTSP socket of that session
     int m_StreamID;                                           // number of simulated stream of that session
     IPPORT m_ClientRTPPort;                                  // client port for UDP based RTP transport
     IPPORT m_ClientRTCPPort;                                 // client port for UDP based RTCP transport

@@ -22,7 +22,10 @@ CONFIG(debug, debug|release) {
     LIBS = -L../../../CommonLibs/release
 }
 
-LIBS += -lMultimedia -lSystem -latomic -lpthread -ljpeg -lv4l2
+LIBS += -lMultimedia -lSystem -latomic -lpthread
+unix {
+    LIBS += -ljpeg -lv4l2
+}
 
 HEADERS += \
     platglue-lf.h \

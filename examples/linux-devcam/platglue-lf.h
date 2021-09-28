@@ -1,8 +1,8 @@
 #pragma once
 
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+//#include <sys/socket.h>
+//#include <netinet/in.h>
+//#include <arpa/inet.h>
 #include <unistd.h>
 
 #include <stdlib.h>
@@ -91,12 +91,12 @@ private:
     UDP_Socket* mSocket {nullptr};
 };
 
-typedef WiFiClient* SOCKET;
+typedef WiFiClient* TCPSOCKET;
 typedef WiFiUdp* UDPSOCKET;
 
 #define NULLSOCKET 0
 
-inline void closesocket(SOCKET s)
+inline void closesocket(TCPSOCKET s)
 {
     // close(s);
     s->Close();
@@ -104,7 +104,7 @@ inline void closesocket(SOCKET s)
 
 #define getRandom() rand()
 
-inline void socketpeeraddr(SOCKET s, IPADDRESS *addr, IPPORT *port)
+inline void socketpeeraddr(TCPSOCKET s, IPADDRESS *addr, IPPORT *port)
 {
     /*
     sockaddr_in r;
@@ -152,7 +152,7 @@ inline UDPSOCKET udpsocketcreate(unsigned short portNum)
 }
 
 // TCP sending
-inline ssize_t socketsend(SOCKET sockfd, const void *buf, size_t len)
+inline ssize_t socketsend(TCPSOCKET sockfd, const void *buf, size_t len)
 {
     // printf("TCP send\n");
     //return send(sockfd, buf, len, 0);
@@ -180,7 +180,7 @@ inline ssize_t udpsocketsend(UDPSOCKET sockfd, const void *buf, size_t len,
 
    Return 0=socket was closed by client, -1=timeout, >0 number of bytes read
  */
-inline int socketread(SOCKET sock, char *buf, size_t buflen, int timeoutmsec)
+inline int socketread(TCPSOCKET sock, char *buf, size_t buflen, int timeoutmsec)
 {
     /*
     // Use a timeout on our socket read to instead serve frames
