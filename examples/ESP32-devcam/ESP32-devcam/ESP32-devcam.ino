@@ -7,7 +7,7 @@
 #include "OV2640Streamer.h"
 #include "CRtspSession.h"
 
-#define ENABLE_OLED //if want use oled ,turn on thi macro
+//#define ENABLE_OLED //if want use oled ,turn on thi macro
 // #define SOFTAP_MODE // If you want to run our own softap turn this on
 #define ENABLE_WEBSERVER
 #define ENABLE_RTSPSERVER
@@ -128,7 +128,7 @@ void setup()
     {
         ;
     }
-    cam.init(esp32cam_config);
+    cam.init(esp32cam_aithinker_config);
 
     IPAddress ip;
 

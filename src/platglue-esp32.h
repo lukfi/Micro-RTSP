@@ -13,15 +13,14 @@
 #include <stdio.h>
 #include <errno.h>
 
-
-typedef WiFiClient *SOCKET;
+typedef WiFiClient *TCPSOCKET;
 typedef WiFiUDP *UDPSOCKET;
 typedef IPAddress IPADDRESS; // On linux use uint32_t in network byte order (per getpeername)
 typedef uint16_t IPPORT; // on linux use network byte order
 
 #define NULLSOCKET NULL
 
-inline void closesocket(SOCKET s) {
+inline void closesocket(TCPSOCKET s) {
     printf("closing TCP socket\n");
 
     if(s) {
@@ -32,7 +31,7 @@ inline void closesocket(SOCKET s) {
 
 #define getRandom() random(65536)
 
-inline void socketpeeraddr(SOCKET s, IPADDRESS *addr, IPPORT *port) {
+inline void socketpeeraddr(TCPSOCKET s, IPADDRESS *addr, IPPORT *port) {
     *addr = s->remoteIP();
     *port = s->remotePort();
 }
@@ -59,7 +58,7 @@ inline UDPSOCKET udpsocketcreate(unsigned short portNum)
 }
 
 // TCP sending
-inline ssize_t socketsend(SOCKET sockfd, const void *buf, size_t len)
+inline ssize_t socketsend(TCPSOCKET sockfd, const void *buf, size_t len)
 {
     return sockfd->write((uint8_t *) buf, len);
 }
@@ -80,7 +79,7 @@ inline ssize_t udpsocketsend(UDPSOCKET sockfd, const void *buf, size_t len,
 
    Return 0=socket was closed by client, -1=timeout, >0 number of bytes read
  */
-inline int socketread(SOCKET sock, char *buf, size_t buflen, int timeoutmsec)
+inline int socketread(TCPSOCKET sock, char *buf, size_t buflen, int timeoutmsec)
 {
     if(!sock->connected()) {
         printf("client has closed the socket\n");

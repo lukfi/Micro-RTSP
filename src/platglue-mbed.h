@@ -5,7 +5,7 @@
 
 #include "mbed.h"
 
-typedef TCPSocket*    SOCKET;
+typedef TCPSocket*    TCPSOCKET;
 typedef UDPSocket*    UDPSOCKET;
 typedef SocketAddress IPADDRESS;
 typedef uint16_t      IPPORT;
@@ -13,7 +13,7 @@ typedef uint16_t      IPPORT;
 #define SEND_TMEOUT_MS    1000
 #define NULLSOCKET        NULL
 
-inline void closesocket(SOCKET s)
+inline void closesocket(TCPSOCKET s)
 {
     if (s)
     {
@@ -23,7 +23,7 @@ inline void closesocket(SOCKET s)
 
 #define getRandom() rand()
 
-inline void socketpeeraddr(SOCKET s, IPADDRESS* addr, IPPORT* port)
+inline void socketpeeraddr(TCPSOCKET s, IPADDRESS* addr, IPPORT* port)
 {
     s->getpeername(addr);
     *port = addr->get_port();
@@ -64,7 +64,7 @@ udpsocketsend(UDPSOCKET sockfd, const void* buf, size_t len, IPADDRESS destaddr,
     }
 }
 // TCP sending
-inline ssize_t socketsend(SOCKET sockfd, const void* buf, size_t len)
+inline ssize_t socketsend(TCPSOCKET sockfd, const void* buf, size_t len)
 {
     if (sockfd && buf)
     {
@@ -78,7 +78,7 @@ inline ssize_t socketsend(SOCKET sockfd, const void* buf, size_t len)
     }
 }
 
-inline int socketread(SOCKET sock, char* buf, size_t buflen, int timeoutmsec)
+inline int socketread(TCPSOCKET sock, char* buf, size_t buflen, int timeoutmsec)
 {
     if (sock && buf)
     {
