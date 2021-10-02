@@ -98,7 +98,7 @@ int CStreamer::SendRtpPacket(unsigned const char * jpeg, int jpegLen, int fragme
        type 0 video is downsampled horizontally by 2 (often called 4:2:2)
        while the chrominance components of type 1 video are downsampled both
        horizontally and vertically by 2 (often called 4:2:0). */
-    RtpBuf[20] = 0x00;                               // type (fixme might be wrong for camera data) https://tools.ietf.org/html/rfc2435
+    RtpBuf[20] = 1;                            // type (fixme might be wrong for camera data) https://tools.ietf.org/html/rfc2435
     RtpBuf[21] = q;                               // quality scale factor was 0x5e
     RtpBuf[22] = m_width / 8;                           // width  / 8
     RtpBuf[23] = m_height / 8;                           // height / 8

@@ -5,3 +5,5 @@ examples/ESP32-devcam/ESP32-devcam/Release/
 examples/ESP32-devcam/ESP32-devcam/Debug/
 examples/ESP32-devcam/ESP32-devcam/__vm/
 examples/ESP32-devcam/.vs/
+
+examples/build*
