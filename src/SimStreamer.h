@@ -10,6 +10,6 @@ class SimStreamer : public CStreamer
 public:
     SimStreamer(bool showBig);
 
-    virtual void    streamImage(uint32_t curMsec);
+    virtual void streamImage(uint32_t curMsec);
 };
 #endif

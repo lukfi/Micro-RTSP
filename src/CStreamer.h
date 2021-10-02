@@ -15,6 +15,7 @@ public:
     LinkedListElement* getClientsListHead() { return &m_Clients; }
 
     int anySessions() { return m_Clients.NotEmpty(); }
+    bool anySessionsStreaming();
 
     bool handleRequests(uint32_t readTimeoutMs);
 

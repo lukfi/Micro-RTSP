@@ -42,6 +42,22 @@ void CStreamer::addSession(WiFiClient& aClient)
     // we have it stored in m_Clients
 }
 
+bool CStreamer::anySessionsStreaming()
+{
+    LinkedListElement* element = m_Clients.m_Next;
+    CRtspSession* session = NULL;
+    while (element != &m_Clients)
+    {
+        session = static_cast<CRtspSession*>(element);
+        if (session->m_streaming)
+        {
+            return true;
+        }
+        element = element->m_Next;
+    }
+    return false;
+}
+
 int CStreamer::SendRtpPacket(unsigned const char * jpeg, int jpegLen, int fragmentOffset, BufPtr quant0tbl, BufPtr quant1tbl)
 {
     // printf("CStreamer::SendRtpPacket offset:%d - begin\n", fragmentOffset);
@@ -75,36 +91,37 @@ int CStreamer::SendRtpPacket(unsigned const char * jpeg, int jpegLen, int fragme
     RtpBuf[2]  = (RtpPacketSize & 0x0000FF00) >> 8;
     RtpBuf[3]  = (RtpPacketSize & 0x000000FF);
     // Prepare the 12 byte RTP header
-    RtpBuf[4]  = 0x80;                               // RTP version
-    RtpBuf[5]  = 0x1a | (isLastFragment ? 0x80 : 0x00);                               // JPEG payload (26) and marker bit
-    RtpBuf[7]  = m_SequenceNumber & 0x0FF;           // each packet is counted with a sequence counter
+    RtpBuf[4]  = 0x80;                                  // RTP version
+    RtpBuf[5]  = 0x1a | (isLastFragment ? 0x80 : 0x00); // JPEG payload (26) and marker bit
+    RtpBuf[7]  = m_SequenceNumber & 0x0FF;              // each packet is counted with a sequence counter
     RtpBuf[6]  = m_SequenceNumber >> 8;
-    RtpBuf[8]  = (m_Timestamp & 0xFF000000) >> 24;   // each image gets a timestamp
+    RtpBuf[8]  = (m_Timestamp & 0xFF000000) >> 24;      // each image gets a timestamp
     RtpBuf[9]  = (m_Timestamp & 0x00FF0000) >> 16;
     RtpBuf[10] = (m_Timestamp & 0x0000FF00) >> 8;
     RtpBuf[11] = (m_Timestamp & 0x000000FF);
-    RtpBuf[12] = 0x13;                               // 4 byte SSRC (sychronization source identifier)
-    RtpBuf[13] = 0xf9;                               // we just an arbitrary number here to keep it simple
+    RtpBuf[12] = 0x13;                                  // 4 byte SSRC (sychronization source identifier)
+    RtpBuf[13] = 0xf9;                                  // we just an arbitrary number here to keep it simple
     RtpBuf[14] = 0x7e;
     RtpBuf[15] = 0x67;
 
     // Prepare the 8 byte payload JPEG header
-    RtpBuf[16] = 0x00;                               // type specific
-    RtpBuf[17] = (fragmentOffset & 0x00FF0000) >> 16;                               // 3 byte fragmentation offset for fragmented images
+    RtpBuf[16] = 0x0;                                // type specific
+    RtpBuf[17] = (fragmentOffset & 0x00FF0000) >> 16; // 3 byte fragmentation offset for fragmented images
     RtpBuf[18] = (fragmentOffset & 0x0000FF00) >> 8;
     RtpBuf[19] = (fragmentOffset & 0x000000FF);
 
-    /*    These sampling factors indicate that the chrominance components of
+    /* These sampling factors indicate that the chrominance components of
        type 0 video is downsampled horizontally by 2 (often called 4:2:2)
        while the chrominance components of type 1 video are downsampled both
        horizontally and vertically by 2 (often called 4:2:0). */
     RtpBuf[20] = 1;                            // type (fixme might be wrong for camera data) https://tools.ietf.org/html/rfc2435
-    RtpBuf[21] = q;                               // quality scale factor was 0x5e
-    RtpBuf[22] = m_width / 8;                           // width  / 8
-    RtpBuf[23] = m_height / 8;                           // height / 8
+    RtpBuf[21] = q;                            // quality scale factor was 0x5e
+    RtpBuf[22] = m_width / 8;                  // width  / 8
+    RtpBuf[23] = m_height / 8;                 // height / 8
 
     int headerLen = 24; // Inlcuding jpeg header but not qant table header
-    if(includeQuantTbl) { // we need a quant header - but only in first packet of the frame
+    if(includeQuantTbl) // we need a quant header - but only in first packet of the frame
+    {
         //printf("inserting quanttbl\n");
         RtpBuf[24] = 0; // MBZ
         RtpBuf[25] = 0; // 8 bit precision
@@ -406,7 +423,7 @@ bool decodeJPEGfile(BufPtr *start, uint32_t *len, BufPtr *qtable0, BufPtr *qtabl
 
     // endlen must now be the # of bytes between the start of our scan and
     // the end marker, tell the caller to ignore bytes afterwards
-    *len = endmarkerptr - *start;
+    *len = endmarkerptr - *start - 2; // LF# -2 added to skip end marker
 
     return true;
 }

@@ -1,5 +1,7 @@
 #include "platglue.h"
 
+#include "SimStreamer.h"
+
 #include "camerastreamer.h"
 #include "CRtspSession.h"
 #include <assert.h>
@@ -40,7 +42,7 @@ void Loop()
     gStreamer->handleRequests(0); // we don't use a timeout here,
     // instead we send only if we have new enough frames
     uint32_t now = millis();
-    if(gStreamer->anySessions())
+    if(gStreamer->anySessionsStreaming())
     {
         if(now > lastimage + msecPerFrame || now < lastimage)
         {
@@ -60,6 +62,7 @@ void Loop()
 
 int main()
 {
+//    gStreamer = new SimStreamer(false);
     gStreamer = new CameraStreamer();
 
     gThread.SetLoopTimeout(100);

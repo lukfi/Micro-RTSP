@@ -5,6 +5,10 @@
 #include "video/videodevice.h"
 #include "threads/iothread.h"
 
+#if M_OS == M_OS_WINDOWS
+#include "graphics/jpeg.h"
+#endif
+
 class CameraStreamer : public CStreamer
 {
 public:
@@ -15,11 +19,16 @@ public:
 
 private:
     void OnNewFrame(LF::video::VideoDevice* device);
+    void OnNewJPEGFrame(LF::video::VideoDevice* device);
     LF::video::VideoDevice* mDevice {nullptr};
     LF::graphic::RawImage mImage;
     std::atomic_bool mNewFrame { false };
 
     LF::threads::IOThread mCameraThread;
+
+#if M_OS == M_OS_WINDOWS
+    LF::graphic::JPEGEncoder mEncoder;
+#endif
 };
 
 #endif // CAMERASTREAMER_H
