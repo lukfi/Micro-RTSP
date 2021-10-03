@@ -7,7 +7,7 @@
 /*********************************/
 
 CameraStreamer::CameraStreamer() :
-    CStreamer(640, 480)
+    CStreamer()
 {
     int chosenDeviceId = -1;
     int chosenFormatId = -1;
@@ -85,7 +85,7 @@ void CameraStreamer::OnNewFrame(LF::video::VideoDevice *device)
 {
     if (mNewFrame) return;
     device->GetFrame(mImage);
-    SDEB("OnNewFrame: %dx%d", mImage.GetWidth(), mImage.GetHeight());
+//    SDEB("OnNewFrame: %dx%d", mImage.GetWidth(), mImage.GetHeight());
     mNewFrame = true;
 }
 

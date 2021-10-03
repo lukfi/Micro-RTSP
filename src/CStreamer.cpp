@@ -3,7 +3,8 @@
 
 #include <stdio.h>
 
-CStreamer::CStreamer(u_short width, u_short height) : m_Clients()
+CStreamer::CStreamer() :
+    m_Clients()
 {
     printf("Creating TSP streamer\n");
     m_RtpServerPort  = 0;
@@ -16,8 +17,6 @@ CStreamer::CStreamer(u_short width, u_short height) : m_Clients()
     m_RtpSocket = NULLSOCKET;
     m_RtcpSocket = NULLSOCKET;
 
-    m_width = width;
-    m_height = height;
     m_prevMsec = 0;
 
     m_udpRefCount = 0;
@@ -58,18 +57,21 @@ bool CStreamer::anySessionsStreaming()
     return false;
 }
 
-int CStreamer::SendRtpPacket(unsigned const char * jpeg, int jpegLen, int fragmentOffset, BufPtr quant0tbl, BufPtr quant1tbl)
+int CStreamer::SendRtpPacket(const DecodedImageInfo& info, uint32_t fragmentOffset)
 {
-    // printf("CStreamer::SendRtpPacket offset:%d - begin\n", fragmentOffset);
-#define KRtpHeaderSize 12           // size of the RTP header
-#define KJpegHeaderSize 8           // size of the special JPEG payload header
+    // printf("CStreamer::SendRtpPacket offset: %d - begin\n", fragmentOffset);
+    const int KRtpHeaderSize = 12;           // size of the RTP header
+    const int KJpegHeaderSize = 8;           // size of the special JPEG payload header
 
-#define MAX_FRAGMENT_SIZE 1100 // FIXME, pick more carefully
+    const int MAX_FRAGMENT_SIZE = 1100;     // FIXME, pick more carefully
+
     int fragmentLen = MAX_FRAGMENT_SIZE;
-    if(fragmentLen + fragmentOffset > jpegLen) // Shrink last fragment if needed
-        fragmentLen = jpegLen - fragmentOffset;
+    if (fragmentLen + fragmentOffset > info.payloadLen) // Shrink last fragment if needed
+    {
+        fragmentLen = info.payloadLen - fragmentOffset;
+    }
 
-    bool isLastFragment = (fragmentOffset + fragmentLen) == jpegLen;
+    bool isLastFragment = (fragmentOffset + fragmentLen) == info.payloadLen;
 
     if (!m_Clients.NotEmpty())
     {
@@ -78,7 +80,7 @@ int CStreamer::SendRtpPacket(unsigned const char * jpeg, int jpegLen, int fragme
 
     // Do we have custom quant tables? If so include them per RFC
 
-    bool includeQuantTbl = quant0tbl && quant1tbl && fragmentOffset == 0;
+    bool includeQuantTbl = info.qTable0 && info.qTable1 && fragmentOffset == 0;
     uint8_t q = includeQuantTbl ? 128 : 0x5e;
 
     static char RtpBuf[2048]; // Note: we assume single threaded, this large buf we keep off of the tiny stack
@@ -114,13 +116,13 @@ int CStreamer::SendRtpPacket(unsigned const char * jpeg, int jpegLen, int fragme
        type 0 video is downsampled horizontally by 2 (often called 4:2:2)
        while the chrominance components of type 1 video are downsampled both
        horizontally and vertically by 2 (often called 4:2:0). */
-    RtpBuf[20] = 1;                            // type (fixme might be wrong for camera data) https://tools.ietf.org/html/rfc2435
-    RtpBuf[21] = q;                            // quality scale factor was 0x5e
-    RtpBuf[22] = m_width / 8;                  // width  / 8
-    RtpBuf[23] = m_height / 8;                 // height / 8
+    RtpBuf[20] = info.type;       // type as described in https://tools.ietf.org/html/rfc2435
+    RtpBuf[21] = q;               // quality scale factor was 0x5e
+    RtpBuf[22] = info.width / 8;     // width  / 8
+    RtpBuf[23] = info.height / 8;    // height / 8
 
     int headerLen = 24; // Inlcuding jpeg header but not qant table header
-    if(includeQuantTbl) // we need a quant header - but only in first packet of the frame
+    if (includeQuantTbl) // we need a quant header - but only in first packet of the frame
     {
         //printf("inserting quanttbl\n");
         RtpBuf[24] = 0; // MBZ
@@ -132,19 +134,20 @@ int CStreamer::SendRtpPacket(unsigned const char * jpeg, int jpegLen, int fragme
 
         headerLen += 4;
 
-        memcpy(RtpBuf + headerLen, quant0tbl, numQantBytes);
+        memcpy(RtpBuf + headerLen, info.qTable0, numQantBytes);
         headerLen += numQantBytes;
 
-        memcpy(RtpBuf + headerLen, quant1tbl, numQantBytes);
+        memcpy(RtpBuf + headerLen, info.qTable1, numQantBytes);
         headerLen += numQantBytes;
     }
     // printf("Sending timestamp %d, seq %d, fragoff %d, fraglen %d, jpegLen %d\n", m_Timestamp, m_SequenceNumber, fragmentOffset, fragmentLen, jpegLen);
 
     // append the JPEG scan data to the RTP buffer
-    memcpy(RtpBuf + headerLen,jpeg + fragmentOffset, fragmentLen);
+    memcpy(RtpBuf + headerLen, info.jpegPayload + fragmentOffset, fragmentLen);
     fragmentOffset += fragmentLen;
 
-    m_SequenceNumber++;                              // prepare the packet counter for the next packet
+    // prepare the packet counter for the next packet
+    m_SequenceNumber++;
 
     IPADDRESS otherip;
     IPPORT otherport;
@@ -152,16 +155,22 @@ int CStreamer::SendRtpPacket(unsigned const char * jpeg, int jpegLen, int fragme
     // RTP marker bit must be set on last fragment
     LinkedListElement* element = m_Clients.m_Next;
     CRtspSession* session = NULL;
+
     while (element != &m_Clients)
     {
         session = static_cast<CRtspSession*>(element);
-        if (session->m_streaming && !session->m_stopped) {
-            if (session->isTcpTransport()) // RTP over RTSP - we send the buffer + 4 byte additional header
-                socketsend(session->getClient(),RtpBuf,RtpPacketSize + 4);
-            else                // UDP - we send just the buffer by skipping the 4 byte RTP over RTSP header
+        if (session->m_streaming && !session->m_stopped)
+        {
+            if (session->isTcpTransport())
             {
+                // RTP over RTSP - we send the buffer + 4 byte additional header
+                socketsend(session->getClient(), RtpBuf, RtpPacketSize + 4);
+            }
+            else
+            {
+                // UDP - we send just the buffer by skipping the 4 byte RTP over RTSP header
                 socketpeeraddr(session->getClient(), &otherip, &otherport);
-                udpsocketsend(m_RtpSocket,&RtpBuf[4],RtpPacketSize, otherip, session->getRtpClientPort());
+                udpsocketsend(m_RtpSocket, &RtpBuf[4], RtpPacketSize, otherip, session->getRtpClientPort());
             }
         }
         element = element->m_Next;
@@ -192,7 +201,8 @@ bool CStreamer::InitUdpTransport(void)
     {
         m_RtpSocket     = udpsocketcreate(P);
         if (m_RtpSocket)
-        {   // Rtp socket was bound successfully. Lets try to bind the consecutive Rtsp socket
+        {
+            // Rtp socket was bound successfully. Lets try to bind the consecutive Rtsp socket
             m_RtcpSocket = udpsocketcreate(P + 1);
             if (m_RtcpSocket)
             {
@@ -252,8 +262,11 @@ bool CStreamer::handleRequests(uint32_t readTimeoutMs)
 
 void CStreamer::streamFrame(unsigned const char *data, uint32_t dataLen, uint32_t curMsec)
 {
-    if(m_prevMsec == 0) // first frame init our timestamp
+    if (m_prevMsec == 0)
+    {
+        // first frame init our timestamp
         m_prevMsec = curMsec;
+    }
 
     // compute deltat (being careful to handle clock rollover with a little lie)
     uint32_t deltams = (curMsec >= m_prevMsec) ? curMsec - m_prevMsec : 100;
@@ -262,19 +275,26 @@ void CStreamer::streamFrame(unsigned const char *data, uint32_t dataLen, uint32_
     // locate quant tables if possible
     BufPtr qtable0, qtable1;
 
-    if(!decodeJPEGfile(&data, &dataLen, &qtable0, &qtable1)) {
+    DecodedImageInfo info;
+
+    if (!decodeJPEGfile(data, dataLen, info))
+    {
         printf("can't decode jpeg data\n");
         return;
     }
+//    printf("Decoded image %dx%d, q0: %p, q1: %p, type: %d, payload size: %d, %p\n",
+//           info.width, info.height, info.qTable0, info.qTable1, info.type, info.payloadLen, info.jpegPayload);
 
     int offset = 0;
-    do {
-        offset = SendRtpPacket(data, dataLen, offset, qtable0, qtable1);
-    } while(offset != 0);
+    do
+    {
+        offset = SendRtpPacket(info, offset);
+    }
+    while (offset != 0);
 
     // Increment ONLY after a full frame
     uint32_t units = 90000; // Hz per RFC 2435
-    m_Timestamp += (units * deltams / 1000);                             // fixed timestamp increment for a frame rate of 25fps
+    m_Timestamp += (units * deltams / 1000);    // fixed timestamp increment for a frame rate of 25fps
 
     m_SendIdx++;
     if (m_SendIdx > 1) m_SendIdx = 0;
@@ -297,21 +317,26 @@ void CStreamer::streamFrame(unsigned const char *data, uint32_t dataLen, uint32_
 // therefore 4:2:2, with two separate quant tables (0 and 1)
 // SOS da
 // EOI d9 (no need to strip data after this RFC says client will discard)
-bool findJPEGheader(BufPtr *start, uint32_t *len, uint8_t marker) {
+bool findJPEGheader(BufPtr *start, uint32_t *len, uint8_t marker)
+{
     // per https://en.wikipedia.org/wiki/JPEG_File_Interchange_Format
     unsigned const char *bytes = *start;
 
     // kinda skanky, will break if unlucky and the headers inxlucde 0xffda
     // might fall off array if jpeg is invalid
     // FIXME - return false instead
-    while(bytes - *start < *len) {
+    while (bytes - *start < *len)
+    {
         uint8_t framing = *bytes++; // better be 0xff
-        if(framing != 0xff) {
+        if(framing != 0xff)
+        {
             printf("malformed jpeg, framing=%x\n", framing);
             return false;
         }
         uint8_t typecode = *bytes++;
-        if(typecode == marker) {
+
+        if(typecode == marker)
+        {
             unsigned skipped = bytes - *start;
             //printf("found marker 0x%x, skipped %d\n", marker, skipped);
 
@@ -322,10 +347,12 @@ bool findJPEGheader(BufPtr *start, uint32_t *len, uint8_t marker) {
 
             return true;
         }
-        else {
+        else
+        {
             // not the section we were looking for, skip the entire section
-            switch(typecode) {
-            case 0xd8:     // start of image
+            switch(typecode)
+            {
+            case 0xd8:   // start of image
             {
                 break;   // no data to skip
             }
@@ -355,18 +382,23 @@ bool findJPEGheader(BufPtr *start, uint32_t *len, uint8_t marker) {
 // the scan data uses byte stuffing to guarantee anything that starts with 0xff
 // followed by something not zero, is a new section.  Look for that marker and return the ptr
 // pointing there
-void skipScanBytes(BufPtr *start) {
+void skipScanBytes(BufPtr *start)
+{
     BufPtr bytes = *start;
 
-    while(true) { // FIXME, check against length
+    while(true)
+    {
+        // FIXME, check against length
         while(*bytes++ != 0xff);
-        if(*bytes++ != 0) {
+        if(*bytes++ != 0)
+        {
             *start = bytes - 2; // back up to the 0xff marker we just found
             return;
         }
     }
 }
-void  nextJpegBlock(BufPtr *bytes) {
+void  nextJpegBlock(BufPtr *bytes)
+{
     uint32_t len = (*bytes)[0] * 256 + (*bytes)[1];
     //printf("going to next jpeg block %d bytes\n", len);
     *bytes += len;
@@ -375,47 +407,97 @@ void  nextJpegBlock(BufPtr *bytes) {
 // When JPEG is stored as a file it is wrapped in a container
 // This function fixes up the provided start ptr to point to the
 // actual JPEG stream data and returns the number of bytes skipped
-bool decodeJPEGfile(BufPtr *start, uint32_t *len, BufPtr *qtable0, BufPtr *qtable1) {
+bool decodeJPEGfile(BufPtr start, uint32_t len, DecodedImageInfo &info)
+{
     // per https://en.wikipedia.org/wiki/JPEG_File_Interchange_Format
-    unsigned const char *bytes = *start;
+    unsigned const char* bytes = start;
+    uint32_t length = len;
 
-    if(!findJPEGheader(&bytes, len, 0xd8)) // better at least look like a jpeg file
+    if (!findJPEGheader(&bytes, &length, 0xd8)) // better at least look like a jpeg file
+    {
         return false; // FAILED!
+    }
+
+    info.type = 0;
+    // Find SOF0
+    // decoding done based on documentation found at:
+    // http://vip.sugovica.hu/Sardi/kepnezo/JPEG%20File%20Layout%20and%20Format.htm
+    // to determine the Type field as described in [4.1.  The Type Field]:
+    // https://datatracker.ietf.org/doc/html/rfc2435
+    {
+        BufPtr markerData = nullptr;
+        uint32_t markerLen;
+        if ((markerData = findJPEGheader2(start, len, 0xC0, markerLen)))
+        {
+            int components = (markerLen - 8) / 3;
+            markerData += 2; // skip len
+            markerData += 1; // skip data precision
+            info.height = markerData[0] << 8 | markerData[1];
+            markerData += 2; // skip height
+            info.width = markerData[0] << 8 | markerData[1];
+            markerData += 2; // skip width
+            uint32_t componentsCount = markerData[0];
+            markerData += 1; // skip components count
+//            printf("Found marker %02x length: %d, width: %d, height: %d, components:%d\n",
+//                   0xC0, markerLen, info.width, info.height, components);
+
+            for (int c = 0; c < components; ++c)
+            {
+                if (c == 0)
+                {
+                    if (markerData[1] == 0x22)
+                    {
+                        info.type = 1;
+                    }
+                    break;
+                }
+                printf("C%d: %02x %02x %02x, TYPE: %d\n",
+                       c, markerData[0], markerData[1], markerData[2], info.type);
+                markerData += 3;
+            }
+        }
+    }
 
     // Look for quant tables if they are present
-    *qtable0 = NULL;
-    *qtable1 = NULL;
-    BufPtr quantstart = *start;
-    uint32_t quantlen = *len;
-    if(!findJPEGheader(&quantstart, &quantlen, 0xdb)) {
+    info.qTable0 = nullptr;
+    info.qTable1 = nullptr;
+
+    BufPtr quantstart = start;
+    uint32_t quantlen = len;
+    if (!findJPEGheader(&quantstart, &quantlen, 0xdb))
+    {
         printf("error can't find quant table 0\n");
     }
-    else {
+    else
+    {
         // printf("found quant table %x\n", quantstart[2]);
-
-        *qtable0 = quantstart + 3;     // 3 bytes of header skipped
+        info.qTable0 = quantstart + 3;     // 3 bytes of header skipped
         nextJpegBlock(&quantstart);
-        if(!findJPEGheader(&quantstart, &quantlen, 0xdb)) {
+        if(!findJPEGheader(&quantstart, &quantlen, 0xdb))
+        {
             printf("error can't find quant table 1\n");
         }
-        else {
+        else
+        {
             // printf("found quant table %x\n", quantstart[2]);
         }
-        *qtable1 = quantstart + 3;
+        info.qTable1 = quantstart + 3;
         nextJpegBlock(&quantstart);
     }
 
-    if(!findJPEGheader(start, len, 0xda))
+    // find Start of Scan (SOS) marker to determine start of
+    // JPEG payload
+    if(!findJPEGheader(&start, &len, 0xda))
         return false; // FAILED!
 
     // Skip the header bytes of the SOS marker FIXME why doesn't this work?
-    uint32_t soslen = (*start)[0] * 256 + (*start)[1];
-    *start += soslen;
-    *len -= soslen;
+    uint32_t soslen = (start)[0] * 256 + (start)[1];
+    start += soslen;
+    len -= soslen;
 
     // start scanning the data portion of the scan to find the end marker
-    BufPtr endmarkerptr = *start;
-    uint32_t endlen = *len;
+    BufPtr endmarkerptr = start;
+    uint32_t endlen =  len;
 
     skipScanBytes(&endmarkerptr);
     if(!findJPEGheader(&endmarkerptr, &endlen, 0xd9))
@@ -423,7 +505,65 @@ bool decodeJPEGfile(BufPtr *start, uint32_t *len, BufPtr *qtable0, BufPtr *qtabl
 
     // endlen must now be the # of bytes between the start of our scan and
     // the end marker, tell the caller to ignore bytes afterwards
-    *len = endmarkerptr - *start - 2; // LF# -2 added to skip end marker
+    len = endmarkerptr - start - 2; // LF# -2 to skip end marker
+
+    info.jpegPayload = start;
+    info.payloadLen = len;
 
     return true;
+}
+BufPtr findJPEGheader2(const BufPtr startData, uint32_t dataLen, uint8_t marker, uint32_t &length)
+{
+    BufPtr ret = nullptr;
+    length = 0;
+
+    for (int i = 0; i < dataLen - 1; ++i)
+    {
+        if (startData[i] == 0xff && startData[i + 1] == marker)
+        {
+            ret = &startData[i + 2];
+            // not the section we were looking for, skip the entire section
+            switch(marker)
+            {
+            case 0xd8:   // start of image
+            case 0xd9:   // start of image
+            {
+                break;   // no data to skip
+            }
+            case 0xe0:   // app0
+            case 0xdb:   // dqt
+            case 0xc4:   // dht
+            case 0xc0:   // sof0
+            case 0xda:   // sos
+            {
+                if (dataLen < i + 4)
+                {
+                    ret = nullptr;
+                    printf("not enaugh data to read length field\n");
+                }
+                else
+                {
+                    // standard format section with 2 bytes for len.  skip that many bytes
+                    uint32_t len = startData[i + 2] * 256 + startData[i + 3];
+                    if (i + 2 + len > dataLen)
+                    {
+                        ret = nullptr;
+                        printf("not enaugh data to read whole marker");
+                    }
+                    else
+                    {
+                        length = len;
+                    }
+                }
+                break;
+            }
+            default:
+                printf("unexpected jpeg typecode 0x%x\n", marker);
+                break;
+            }
+            break;
+        }
+    }
+
+    return ret;
 }
