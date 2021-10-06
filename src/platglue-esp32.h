@@ -68,9 +68,12 @@ inline ssize_t udpsocketsend(UDPSOCKET sockfd, const void *buf, size_t len,
 {
     sockfd->beginPacket(destaddr, destport);
     sockfd->write((const uint8_t *)  buf, len);
-    if(!sockfd->endPacket())
+    if (!sockfd->endPacket())
+    {
         printf("error sending udp packet\n");
-
+        return -1;
+    }
+    //printf("LF# Sent butes: %d\n", len);
     return len;
 }
 

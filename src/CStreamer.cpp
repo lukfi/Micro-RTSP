@@ -63,7 +63,7 @@ int CStreamer::SendRtpPacket(const DecodedImageInfo& info, uint32_t fragmentOffs
     const int KRtpHeaderSize = 12;           // size of the RTP header
     const int KJpegHeaderSize = 8;           // size of the special JPEG payload header
 
-    const int MAX_FRAGMENT_SIZE = 1100;     // FIXME, pick more carefully
+    const int MAX_FRAGMENT_SIZE = 508;     // FIXME, pick more carefully
 
     int fragmentLen = MAX_FRAGMENT_SIZE;
     if (fragmentLen + fragmentOffset > info.payloadLen) // Shrink last fragment if needed
@@ -122,8 +122,9 @@ int CStreamer::SendRtpPacket(const DecodedImageInfo& info, uint32_t fragmentOffs
     RtpBuf[23] = info.height / 8;    // height / 8
 
     int headerLen = 24; // Inlcuding jpeg header but not qant table header
-    if (includeQuantTbl) // we need a quant header - but only in first packet of the frame
+    if (includeQuantTbl)
     {
+        // we need a quant header - but only in first packet of the frame
         //printf("inserting quanttbl\n");
         RtpBuf[24] = 0; // MBZ
         RtpBuf[25] = 0; // 8 bit precision
@@ -170,7 +171,11 @@ int CStreamer::SendRtpPacket(const DecodedImageInfo& info, uint32_t fragmentOffs
             {
                 // UDP - we send just the buffer by skipping the 4 byte RTP over RTSP header
                 socketpeeraddr(session->getClient(), &otherip, &otherport);
-                udpsocketsend(m_RtpSocket, &RtpBuf[4], RtpPacketSize, otherip, session->getRtpClientPort());
+                ssize_t sent = udpsocketsend(m_RtpSocket,&RtpBuf[4],RtpPacketSize, otherip, session->getRtpClientPort());
+                if (sent == -1)
+                {
+                    return -1;
+                }
             }
         }
         element = element->m_Next;
@@ -199,7 +204,7 @@ bool CStreamer::InitUdpTransport(void)
 
     for (u_short P = 6970; P < 0xFFFE; P += 2)
     {
-        m_RtpSocket     = udpsocketcreate(P);
+        m_RtpSocket = udpsocketcreate(P);
         if (m_RtpSocket)
         {
             // Rtp socket was bound successfully. Lets try to bind the consecutive Rtsp socket
@@ -286,11 +291,15 @@ void CStreamer::streamFrame(unsigned const char *data, uint32_t dataLen, uint32_
 //           info.width, info.height, info.qTable0, info.qTable1, info.type, info.payloadLen, info.jpegPayload);
 
     int offset = 0;
-    do
+    do 
     {
         offset = SendRtpPacket(info, offset);
-    }
-    while (offset != 0);
+        if (offset == -1)
+        {
+            printf("Sending of RTP packet aborted\n");
+            break;
+        }
+    } while(offset != 0);
 
     // Increment ONLY after a full frame
     uint32_t units = 90000; // Hz per RFC 2435
