@@ -28,11 +28,12 @@ CameraStreamer::CameraStreamer() :
             ss << f;
             SDEB(">>> %s", ss.str().c_str());
             ++formatId;
-            if (f.colorspace == LF::graphic::ColorSpace_t::MJPG &&
+            if ((f.colorspace == LF::graphic::ColorSpace_t::MJPG ||
+                 f.colorspace == LF::graphic::ColorSpace_t::RGB24) &&
                 f.resolution.width == 640 &&
                 f.resolution.height == 480)
             {
-                chosenDeviceId = deviceId;
+                chosenDeviceId = d.mId;
                 chosenFormatId = formatId;
                 break;
             }
