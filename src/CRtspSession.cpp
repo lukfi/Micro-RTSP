@@ -101,11 +101,16 @@ bool CRtspSession::ParseRtspRequest(char const * aRequest, unsigned aRequestSize
     printf("RTSP received %s\n", CmdName);
 
     // find out the command type
-    if (strstr(CmdName,"OPTIONS")   != nullptr) m_RtspCmdType = RTSP_OPTIONS; else
-    if (strstr(CmdName,"DESCRIBE")  != nullptr) m_RtspCmdType = RTSP_DESCRIBE; else
-    if (strstr(CmdName,"SETUP")     != nullptr) m_RtspCmdType = RTSP_SETUP; else
-    if (strstr(CmdName,"PLAY")      != nullptr) m_RtspCmdType = RTSP_PLAY; else
-    if (strstr(CmdName,"TEARDOWN")  != nullptr) m_RtspCmdType = RTSP_TEARDOWN;
+    if (strstr(CmdName,"OPTIONS") != nullptr)
+        m_RtspCmdType = RTSP_OPTIONS;
+    else if (strstr(CmdName,"DESCRIBE") != nullptr)
+        m_RtspCmdType = RTSP_DESCRIBE;
+    else if (strstr(CmdName,"SETUP") != nullptr)
+        m_RtspCmdType = RTSP_SETUP;
+    else if (strstr(CmdName,"PLAY") != nullptr)
+        m_RtspCmdType = RTSP_PLAY;
+    else if (strstr(CmdName,"TEARDOWN") != nullptr)
+        m_RtspCmdType = RTSP_TEARDOWN;
 
     // check whether the request contains transport information (UDP or TCP)
     if (m_RtspCmdType == RTSP_SETUP)
@@ -383,21 +388,22 @@ int CRtspSession::GetStreamID()
     return m_StreamID;
 };
 
-
-
 /**
    Read from our socket, parsing commands as possible.
  */
 bool CRtspSession::handleRequests(uint32_t readTimeoutMs)
 {
     if(m_stopped)
+    {
         return false; // Already closed down
+    }
 
     static char RecvBuf[RTSP_BUFFER_SIZE];   // Note: we assume single threaded, this large buf we keep off of the tiny stack
 
     memset(RecvBuf,0x00,sizeof(RecvBuf));
     int res = socketread(m_RtspClient,RecvBuf,sizeof(RecvBuf), readTimeoutMs);
-    if(res > 0) {
+    if(res > 0)
+    {
         // we filter away everything which seems not to be an RTSP command: O-ption, D-escribe, S-etup, P-lay, T-eardown
         if ((RecvBuf[0] == 'O') || (RecvBuf[0] == 'D') || (RecvBuf[0] == 'S') || (RecvBuf[0] == 'P') || (RecvBuf[0] == 'T'))
         {
@@ -409,14 +415,15 @@ bool CRtspSession::handleRequests(uint32_t readTimeoutMs)
         }
         return true;
     }
-    else if(res == 0) {
+    else if(res == 0)
+    {
         printf("client closed socket, exiting\n");
         m_stopped = true;
         return true;
     }
-    else  {
+    else
+    {
         // Timeout on read
-
         return false;
     }
 }

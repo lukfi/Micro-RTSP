@@ -11,7 +11,7 @@
 #include "net/tcp_server.h"
 
 TCP_Server gServer;
-LF::threads::IOThread gThread;
+//LF::threads::IOThread gThread;
 
 CStreamer* gStreamer;
 
@@ -21,6 +21,9 @@ CStreamer* gStreamer;
 #include "utils/screenlogger.h"
 /*********************************/
 
+#define NEW_MAIN
+
+#ifndef NEW_MAIN
 void OnClientConnected()
 {
     TCP_Socket* client = reinterpret_cast<TCP_Socket*>(gServer.NextPendingConnection());
@@ -75,3 +78,22 @@ int main()
 
     gThread.Join();
 }
+#else
+
+#include "rtspstreamserver.h"
+
+int main()
+{
+    gStreamer = new CameraStreamer();
+    RTSPStreamServer server(gStreamer);
+
+    std::string line;
+    while (true)
+    {
+        std::getline(std::cin, line);
+        if (line == "exit")
+            break;
+    }
+}
+
+#endif

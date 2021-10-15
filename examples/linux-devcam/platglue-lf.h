@@ -10,9 +10,7 @@
 #include <stdio.h>
 #include <errno.h>
 
-
-#include "net/tcp_socket.h"
-#include "net/udp_socket.h"
+#include "net/socketmaster.h"
 #include "utils/datetime.h"
 
 typedef uint32_t IPADDRESS; // On linux use uint32_t in network byte order (per getpeername)
@@ -26,40 +24,97 @@ public:
     {
 
     }
+    WiFiClient(LF::net::SocketMaster* master) :
+        mMaster(master)
+    {
+        mCircular = new LF::utils::CircularBuffer(8092);
+    }
+
+    ~WiFiClient()
+    {
+        delete mCircular;
+    }
 
     void Close()
     {
-        mSocket->Close();
+        if (mSocket)
+        {
+            mSocket->Close();
+        }
+        else
+        {
+            mMaster->SetUserData(nullptr);
+//            mMaster->Close();
+        }
     }
 
     void GetPeedAddress(IPADDRESS* addr, IPPORT* port)
     {
         IP_Address a;
-        mSocket->GetRemoteAddress(a);
+        if (mSocket)
+        {
+            mSocket->GetRemoteAddress(a);
+        }
+        else
+        {
+            mMaster->GetRemoteAddress(a);
+        }
         *addr = a.GetHost().IPv4Host();
         *port = a.GetPort();
     }
 
     ssize_t Send(const void *buf, size_t len)
     {
-        return mSocket->Write((const char*)buf, len);
+        ssize_t wrote = 0;
+        if (mSocket)
+        {
+            wrote = mSocket->Write((const char*)buf, len);
+        }
+        else
+        {
+            MessageBuffer* buffer = new MessageBuffer(reinterpret_cast<const uint8_t*>(buf), len);
+            buffer->Rewind();
+            wrote = buffer->Size();
+            mMaster->ScheduleBuffer(buffer);
+        }
+        return wrote;
     }
 
     int Read(char *buf, size_t buflen, int timeoutmsec)
     {
-        int ret = mSocket->Read(buf, buflen);
-        if (ret == 0)
+        int ret = 0;
+        if (mSocket)
         {
-            ret = -1;
+            ret = mSocket->Read(buf, buflen);
+            if (ret == 0)
+            {
+                ret = -1;
+            }
+            else if (ret == -1)
+            {
+                ret = 0;
+            }
         }
-        else if (ret == -1)
+        else
         {
-            ret = 0;
+            mMaster->Read(*mCircular);
+            ret = mCircular->Get(reinterpret_cast<uint8_t*>(buf), std::min((uint32_t)buflen, mCircular->Size()));
+            if (ret <= 0)
+            {
+                printf("RREETTT = %d\n", ret);
+            }
+            if (ret == 0)
+            {
+                ret = -1;
+            }
         }
+
         return ret;
     }
 private:
     TCP_Socket* mSocket {nullptr};
+    LF::net::SocketMaster* mMaster {nullptr};
+    LF::utils::CircularBuffer* mCircular { nullptr };
 };
 
 class WiFiUdp
@@ -106,21 +161,6 @@ inline void closesocket(TCPSOCKET s)
 
 inline void socketpeeraddr(TCPSOCKET s, IPADDRESS *addr, IPPORT *port)
 {
-    /*
-    sockaddr_in r;
-    socklen_t len = sizeof(r);
-    if(getpeername(s,(struct sockaddr*)&r,&len) < 0) {
-        printf("getpeername failed\n");
-        *addr = 0;
-        *port = 0;
-    }
-    else {
-        //htons
-
-        *port  = r.sin_port;
-        *addr = r.sin_addr.s_addr;
-    }
-    */
     s->GetPeedAddress(addr, port);
 }
 
@@ -131,22 +171,6 @@ inline void udpsocketclose(UDPSOCKET s)
 
 inline UDPSOCKET udpsocketcreate(unsigned short portNum)
 {
-    /*
-    sockaddr_in addr;
-
-    addr.sin_family      = AF_INET;
-    addr.sin_addr.s_addr = INADDR_ANY;
-
-    int s     = socket(AF_INET, SOCK_DGRAM, 0);
-    addr.sin_port = htons(portNum);
-    if (bind(s,(sockaddr*)&addr,sizeof(addr)) != 0) {
-        printf("Error, can't bind\n");
-        close(s);
-        s = 0;
-    }
-
-    return s;
-    */
     WiFiUdp* newSocket = new WiFiUdp(portNum);
     return newSocket;
 }
@@ -154,24 +178,12 @@ inline UDPSOCKET udpsocketcreate(unsigned short portNum)
 // TCP sending
 inline ssize_t socketsend(TCPSOCKET sockfd, const void *buf, size_t len)
 {
-    // printf("TCP send\n");
-    //return send(sockfd, buf, len, 0);
     return sockfd->Send(buf, len);
 }
 
 inline ssize_t udpsocketsend(UDPSOCKET sockfd, const void *buf, size_t len,
                              IPADDRESS destaddr, uint16_t destport)
 {
-    /*
-    sockaddr_in addr;
-
-    addr.sin_family      = AF_INET;
-    addr.sin_addr.s_addr = destaddr;
-    addr.sin_port = htons(destport);
-    //printf("UDP send to 0x%0x:%0x\n", destaddr, destport);
-
-    return sendto(sockfd, buf, len, 0, (sockaddr *) &addr, sizeof(addr));
-    */
     return sockfd->Send(buf, len, destaddr, destport);
 }
 
@@ -182,27 +194,6 @@ inline ssize_t udpsocketsend(UDPSOCKET sockfd, const void *buf, size_t len,
  */
 inline int socketread(TCPSOCKET sock, char *buf, size_t buflen, int timeoutmsec)
 {
-    /*
-    // Use a timeout on our socket read to instead serve frames
-    struct timeval tv;
-    tv.tv_sec = 0;
-    tv.tv_usec = timeoutmsec * 1000; // send a new frame ever
-    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
-
-    int res = recv(sock,buf,buflen,0);
-    if(res > 0) {
-        return res;
-    }
-    else if(res == 0) {
-        return 0; // client dropped connection
-    }
-    else {
-        if (errno == EWOULDBLOCK || errno == EAGAIN)
-            return -1;
-        else
-            return 0; // unknown error, just claim client dropped it
-    };
-    */
     return sock->Read(buf, buflen, timeoutmsec);
 }
 

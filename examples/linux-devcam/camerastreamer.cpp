@@ -67,7 +67,7 @@ CameraStreamer::~CameraStreamer()
 
 void CameraStreamer::streamImage(uint32_t curMsec)
 {
-    if (mDevice)
+    if (anySessionsStreaming())
     {
         uint8_t* data = (uint8_t*)mImage.GetRawData();
         uint32_t len = mImage.GetDataSize();
@@ -84,10 +84,11 @@ void CameraStreamer::streamImage(uint32_t curMsec)
 
 void CameraStreamer::OnNewFrame(LF::video::VideoDevice *device)
 {
-    if (mNewFrame) return;
+    if (!anySessionsStreaming()) return;
     device->GetFrame(mImage);
 //    SDEB("OnNewFrame: %dx%d", mImage.GetWidth(), mImage.GetHeight());
     mNewFrame = true;
+    streamImage(millis());
 }
 
 void CameraStreamer::OnNewJPEGFrame(LF::video::VideoDevice* device)

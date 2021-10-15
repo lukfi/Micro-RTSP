@@ -38,6 +38,6 @@ public:
            m_Next->m_Prev = m_Prev;
        if (m_Prev)
            m_Prev->m_Next = m_Next;
-       printf("~LinkedListElement after: (%p)->(%p)", m_Prev, m_Prev->m_Next);
+       printf("~LinkedListElement after: (%p)->(%p)\n", m_Prev, m_Prev->m_Next);
     }
 };

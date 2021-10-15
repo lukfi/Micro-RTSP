@@ -14,7 +14,8 @@ HEADERS += \
     ../../src/CStreamer.h \
     ../../src/JPEGSamples.h \
     ../../src/CRtspSession.h \
-    camerastreamer.h
+    camerastreamer.h \
+    rtspstreamserver.h
 
 SOURCES += \
         main.cpp \
@@ -22,7 +23,8 @@ SOURCES += \
     ../../src/CStreamer.cpp \
     ../../src/JPEGSamples.cpp \
     ../../src/CRtspSession.cpp \
-    camerastreamer.cpp
+    camerastreamer.cpp \
+    rtspstreamserver.cpp
 
 CONFIG(debug, debug|release) {
     LIBS = -L../../../CommonLibs/debug

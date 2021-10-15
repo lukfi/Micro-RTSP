@@ -34,10 +34,11 @@ CStreamer::~CStreamer()
     }
 };
 
-void CStreamer::addSession(WiFiClient& aClient)
+CRtspSession* CStreamer::addSession(WiFiClient& aClient)
 {
     // printf("CStreamer::addSession\n");
     CRtspSession* session = new CRtspSession(aClient, this); // our threads RTSP session and state
+    return session;
     // we have it stored in m_Clients
 }
 
@@ -171,7 +172,7 @@ int CStreamer::SendRtpPacket(const DecodedImageInfo& info, uint32_t fragmentOffs
             {
                 // UDP - we send just the buffer by skipping the 4 byte RTP over RTSP header
                 socketpeeraddr(session->getClient(), &otherip, &otherport);
-                ssize_t sent = udpsocketsend(m_RtpSocket,&RtpBuf[4],RtpPacketSize, otherip, session->getRtpClientPort());
+                ssize_t sent = udpsocketsend(m_RtpSocket, &RtpBuf[4], RtpPacketSize, otherip, session->getRtpClientPort());
                 if (sent == -1)
                 {
                     return -1;

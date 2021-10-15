@@ -16,13 +16,20 @@ struct DecodedImageInfo
     uint32_t type; // as described in rfc2435 [4.1. The Type Field]
 };
 
+class CRtspSession;
+
 class CStreamer
 {
 public:
     CStreamer();
     virtual ~CStreamer();
+#ifdef USE_LFF
+    void addSession()
+    {
 
-    void addSession(WiFiClient& aClient);
+    }
+#endif
+    CRtspSession* addSession(WiFiClient& aClient);
     LinkedListElement* getClientsListHead() { return &m_Clients; }
 
     int anySessions() { return m_Clients.NotEmpty(); }
@@ -38,7 +45,7 @@ public:
     void ReleaseUdpTransport(void);
 
 protected:
-    void    streamFrame(unsigned const char *data, uint32_t dataLen, uint32_t curMsec);
+    void streamFrame(unsigned const char *data, uint32_t dataLen, uint32_t curMsec);
 
 private:
     int SendRtpPacket(const DecodedImageInfo &info, uint32_t fragmentOffset);// returns new fragmentOffset or 0 if finished with frame
