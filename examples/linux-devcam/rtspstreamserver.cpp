@@ -17,9 +17,9 @@ RTSPStreamServer::RTSPStreamServer(CStreamer *streamer, uint16_t serverPort) :
     mCleanupThread("CleanupThread")
 {
     mRTSPServer = new LF::net::SocketMaster(SocketServerType_t::TCPServer, &mThread, false);
+    mRTSPServer->SetName("RTSPServer");
     mRTSPServer->Listen(serverPort);
 
-//    mThread.RegisterWaitable(mRTSPServer);
     CONNECT(mRTSPServer->SM_CLIENT_CONNECTED, RTSPStreamServer, OnNewClient);
 
     mThread.Start();
@@ -57,25 +57,6 @@ void RTSPStreamServer::OnClientRead(LF::net::SocketMaster *)
 
     // If we have an active client connection, just service that until gone
     mStreamer->handleRequests(0); // we don't use a timeout here,
-
-    // instead we send only if we have new enough frames
-//    uint32_t now = millis();
-//    if (mStreamer->anySessionsStreaming())
-//    {
-//        if (now > lastimage + msecPerFrame || now < lastimage)
-//        {
-//            // handle clock rollover
-//            mStreamer->streamImage(now);
-//            lastimage = now;
-
-//            // check if we are overrunning our max frame rate
-//            now = millis();
-//            if(now > lastimage + msecPerFrame)
-//            {
-//                printf("warning exceeding max frame rate of %d ms\n", now - lastimage);
-//            }
-//        }
-    //    }
 }
 
 void RTSPStreamServer::OnClientDisconnected(LF::net::SocketMaster* sock)

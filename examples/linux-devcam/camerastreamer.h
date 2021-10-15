@@ -15,14 +15,14 @@ public:
     CameraStreamer();
     virtual ~CameraStreamer();
 
-    virtual void streamImage(uint32_t curMsec);
+    virtual void streamImage(uint32_t curMsec) override;
+    virtual bool handleRequests(uint32_t readTimeoutMs) override;
 
 private:
     void OnNewFrame(LF::video::VideoDevice* device);
     void OnNewJPEGFrame(LF::video::VideoDevice* device);
     LF::video::VideoDevice* mDevice {nullptr};
     LF::graphic::RawImage mImage;
-    std::atomic_bool mNewFrame { false };
 
     LF::threads::IOThread mCameraThread;
 

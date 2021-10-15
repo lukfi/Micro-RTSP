@@ -45,14 +45,16 @@ CameraStreamer::CameraStreamer() :
         SDEB("Opening device %d format %d", chosenDeviceId, chosenFormatId);
         mDevice = LF::video::VideoDevice::GetVideoDevice(chosenDeviceId, chosenFormatId);
 
+        std::string threadName = mDevice->GetName() + "Thread";
+        threadName.erase(remove_if(threadName.begin(), threadName.end(), isspace), threadName.end());
+        mCameraThread.SetName(threadName);
+
         mCameraThread.RegisterWaitable(mDevice);
         mCameraThread.Start();
 
         mDevice->SetSpecialOption(0, 0);
         CONNECT(mDevice->NEW_FRAME_AVAILABLE, CameraStreamer, OnNewFrame);
         CONNECT(mDevice->NEW_FRAME_AVAILABLE_JPEG, CameraStreamer, OnNewJPEGFrame);
-
-        mDevice->Start();
     }
     else
     {
@@ -69,25 +71,45 @@ void CameraStreamer::streamImage(uint32_t curMsec)
 {
     if (anySessionsStreaming())
     {
-        uint8_t* data = (uint8_t*)mImage.GetRawData();
-        uint32_t len = mImage.GetDataSize();
+        uint8_t* data = nullptr;
+        uint8_t* dataToSend = nullptr;
+
+        uint32_t len = 0;
 
     #if M_OS == M_OS_WINDOWS
         mEncoder.Encode(data, len, mImage);
+        dataToSend = data;
     #else
-        image = mImage;
+        //image = mImage;
+        dataToSend = mImage.GetNonConstRawData();
+        len = mImage.GetDataSize();
     #endif
-        streamFrame(data, len, curMsec);
-        mNewFrame = false;
+        streamFrame(dataToSend, len, curMsec);
+
+        delete[] data;
     }
+}
+
+bool CameraStreamer::handleRequests(uint32_t readTimeoutMs)
+{
+    bool ret = CStreamer::handleRequests(readTimeoutMs);
+
+    if (ret && !mDevice->IsRunning() && anySessionsStreaming())
+    {
+        mDevice->Start();
+    }
+
+    return ret;
 }
 
 void CameraStreamer::OnNewFrame(LF::video::VideoDevice *device)
 {
-    if (!anySessionsStreaming()) return;
+    if (!anySessionsStreaming())
+    {
+        mDevice->Stop();
+        return;
+    }
     device->GetFrame(mImage);
-//    SDEB("OnNewFrame: %dx%d", mImage.GetWidth(), mImage.GetHeight());
-    mNewFrame = true;
     streamImage(millis());
 }
 
@@ -95,5 +117,4 @@ void CameraStreamer::OnNewJPEGFrame(LF::video::VideoDevice* device)
 {
     SDEB("OnNewJPEGFrame");
     device->GetFrame(mImage);
-    mNewFrame = true;
 }

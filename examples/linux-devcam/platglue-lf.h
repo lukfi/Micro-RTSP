@@ -123,19 +123,30 @@ public:
     WiFiUdp(uint16_t port)
     {
         mSocket = new UDP_Socket();
-        mSocket->Bind(port);
+        bool success = mSocket->Bind(port);
     }
 
     void Close()
     {
         mSocket->Close();
+        delete mSocket;
+        mSocket = nullptr;
     }
 
     ssize_t Send(const void *buf, size_t len,
                  IPADDRESS destaddr, uint16_t destport)
     {
-        IP_Address addr(destaddr, destport);
-        return mSocket->Write((const char*)buf, len, addr);
+        ssize_t wrote = 0;
+        if (mSocket)
+        {
+            IP_Address addr(destaddr, destport);
+            wrote = mSocket->Write((const char*)buf, len, addr);
+        }
+        else
+        {
+            printf("ERROR WRITING UPD DATA\n");
+        }
+        return wrote;
     }
 
     int Read(char *buf, size_t buflen, int timeoutmsec)

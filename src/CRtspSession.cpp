@@ -354,7 +354,7 @@ void CRtspSession::Handle_RtspSETUP()
              Transport,
              m_RtspSessionID);
 
-    socketsend(m_RtspClient,Response,strlen(Response));
+    socketsend(m_RtspClient, Response, strlen(Response));
 }
 
 void CRtspSession::Handle_RtspPLAY()
@@ -393,7 +393,7 @@ int CRtspSession::GetStreamID()
  */
 bool CRtspSession::handleRequests(uint32_t readTimeoutMs)
 {
-    if(m_stopped)
+    if (m_stopped)
     {
         return false; // Already closed down
     }

@@ -35,12 +35,12 @@ public:
     int anySessions() { return m_Clients.NotEmpty(); }
     bool anySessionsStreaming();
 
-    bool handleRequests(uint32_t readTimeoutMs);
+    virtual bool handleRequests(uint32_t readTimeoutMs);
 
     u_short GetRtpServerPort();
     u_short GetRtcpServerPort();
 
-    virtual void    streamImage(uint32_t curMsec) = 0; // send a new image to the client
+    virtual void streamImage(uint32_t curMsec) = 0; // send a new image to the client
     bool InitUdpTransport(void);
     void ReleaseUdpTransport(void);
 
