@@ -4,14 +4,17 @@
 #include "net/tcp_server.h"
 #include "threads/iothread.h"
 
-class CStreamer;
+#include "CStreamer.h"
 
-class RTSPStreamServer
+class RTSPStreamServer : public StreamSink
 {
 public:
     RTSPStreamServer(CStreamer* streamer, uint16_t serverPort = 8554);
 
 private:
+    virtual void StreamFrame(unsigned const char *data, uint32_t dataLen, uint32_t curMsec) override;
+    virtual void StreamFrameThread(unsigned const char *data, uint32_t dataLen, uint32_t curMsec);
+
     CStreamer* mStreamer;
 
     LF::net::SocketMaster* mRTSPServer;

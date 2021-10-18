@@ -84,9 +84,15 @@ void CameraStreamer::streamImage(uint32_t curMsec)
         dataToSend = mImage.GetNonConstRawData();
         len = mImage.GetDataSize();
     #endif
-        streamFrame(dataToSend, len, curMsec);
-
-        delete[] data;
+        if (mSink)
+        {
+            mSink->StreamFrame(dataToSend, len, curMsec);
+        }
+        else
+        {
+            streamFrame(dataToSend, len, curMsec);
+            delete[] data;
+        }
     }
 }
 

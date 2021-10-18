@@ -18,17 +18,23 @@ struct DecodedImageInfo
 
 class CRtspSession;
 
+class StreamSink
+{
+public:
+    virtual void StreamFrame(unsigned const char *data, uint32_t dataLen, uint32_t curMsec) = 0;
+};
+
 class CStreamer
 {
 public:
     CStreamer();
     virtual ~CStreamer();
-#ifdef USE_LFF
-    void addSession()
-    {
 
+    void SetSink(StreamSink* sink)
+    {
+        mSink = sink;
     }
-#endif
+
     CRtspSession* addSession(WiFiClient& aClient);
     LinkedListElement* getClientsListHead() { return &m_Clients; }
 
@@ -44,8 +50,10 @@ public:
     bool InitUdpTransport(void);
     void ReleaseUdpTransport(void);
 
-protected:
     void streamFrame(unsigned const char *data, uint32_t dataLen, uint32_t curMsec);
+
+protected:
+    StreamSink* mSink { nullptr };
 
 private:
     int SendRtpPacket(const DecodedImageInfo &info, uint32_t fragmentOffset);// returns new fragmentOffset or 0 if finished with frame

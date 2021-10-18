@@ -16,6 +16,8 @@ RTSPStreamServer::RTSPStreamServer(CStreamer *streamer, uint16_t serverPort) :
     mThread("RTSPStreamServer"),
     mCleanupThread("CleanupThread")
 {
+    mStreamer->SetSink(this);
+
     mRTSPServer = new LF::net::SocketMaster(SocketServerType_t::TCPServer, &mThread, false);
     mRTSPServer->SetName("RTSPServer");
     mRTSPServer->Listen(serverPort);
@@ -26,16 +28,27 @@ RTSPStreamServer::RTSPStreamServer(CStreamer *streamer, uint16_t serverPort) :
     mCleanupThread.Start();
 }
 
+void RTSPStreamServer::StreamFrame(const unsigned char *data, uint32_t dataLen, uint32_t curMsec)
+{
+    SCHEDULE_TASK(&mThread, &RTSPStreamServer::StreamFrameThread, this, data, dataLen, curMsec);
+}
+
+void RTSPStreamServer::StreamFrameThread(const unsigned char *data, uint32_t dataLen, uint32_t curMsec)
+{
+    mStreamer->streamFrame(data, dataLen, curMsec);
+    delete[] data;
+}
+
 void RTSPStreamServer::OnNewClient(LF::net::SocketMaster*, ConnectionSocket* client)
 {
     if (client)
     {
         SINFO("Client connected!");
 
-        client->SetWaitingFlags(true, true);
         std::string socketName;
         LF::utils::sformat(socketName, "Socket:%d", ++mClientCount);
         client->SetName(socketName);
+
         LF::net::SocketMaster* clientMaster = new LF::net::SocketMaster(reinterpret_cast<TCP_Socket*>(client),
                                                                         &mThread);
         WiFiClient* wifiClient = new WiFiClient(clientMaster);
@@ -44,8 +57,6 @@ void RTSPStreamServer::OnNewClient(LF::net::SocketMaster*, ConnectionSocket* cli
 
         CONNECT(clientMaster->SM_READ, RTSPStreamServer, OnClientRead);
         CONNECT(clientMaster->SM_ERROR, RTSPStreamServer, OnClientDisconnected);
-
-        SCHEDULE_TASK(&mThread, &RTSPStreamServer::OnClientRead, this, clientMaster);
     }
 }
 

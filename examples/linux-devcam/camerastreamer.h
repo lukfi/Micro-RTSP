@@ -18,6 +18,8 @@ public:
     virtual void streamImage(uint32_t curMsec) override;
     virtual bool handleRequests(uint32_t readTimeoutMs) override;
 
+    Signal<void(unsigned const char*, uint32_t, uint32_t)> ON_STREAM_FRAME;
+
 private:
     void OnNewFrame(LF::video::VideoDevice* device);
     void OnNewJPEGFrame(LF::video::VideoDevice* device);

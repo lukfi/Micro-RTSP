@@ -168,7 +168,7 @@ int CStreamer::SendRtpPacket(const DecodedImageInfo& info, uint32_t fragmentOffs
                 // RTP over RTSP - we send the buffer + 4 byte additional header
                 socketsend(session->getClient(), RtpBuf, RtpPacketSize + 4);
             }
-            else
+            else if (m_RtpSocket)
             {
                 // UDP - we send just the buffer by skipping the 4 byte RTP over RTSP header
                 socketpeeraddr(session->getClient(), &otherip, &otherport);
@@ -197,9 +197,11 @@ u_short CStreamer::GetRtcpServerPort()
 
 bool CStreamer::InitUdpTransport(void)
 {
+    printf("InitUdpTransport\n");
     if (m_udpRefCount != 0)
     {
         ++m_udpRefCount;
+        printf("InitUdpTransport: LOL\n");
         return true;
     }
 
@@ -224,21 +226,27 @@ bool CStreamer::InitUdpTransport(void)
         }
     };
     ++m_udpRefCount;
+    printf("UDP transport created\n");
     return true;
 }
 
 void CStreamer::ReleaseUdpTransport(void)
 {
-    --m_udpRefCount;
-    if (m_udpRefCount == 0)
+    if (m_udpRefCount)
     {
-        m_RtpServerPort  = 0;
-        m_RtcpServerPort = 0;
-        udpsocketclose(m_RtpSocket);
-        udpsocketclose(m_RtcpSocket);
+        --m_udpRefCount;
+        printf("ReleaseUdpTransport, ref: %d\n", m_udpRefCount);
+        if (m_udpRefCount == 0)
+        {
+            printf("ReleaseUdpTransport!!!\n");
+            m_RtpServerPort  = 0;
+            m_RtcpServerPort = 0;
+            udpsocketclose(m_RtpSocket);
+            udpsocketclose(m_RtcpSocket);
 
-        m_RtpSocket = NULLSOCKET;
-        m_RtcpSocket = NULLSOCKET;
+            m_RtpSocket = NULLSOCKET;
+            m_RtcpSocket = NULLSOCKET;
+        }
     }
 }
 

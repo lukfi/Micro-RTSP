@@ -123,7 +123,11 @@ public:
     WiFiUdp(uint16_t port)
     {
         mSocket = new UDP_Socket();
-        bool success = mSocket->Bind(port);
+        UDP_OpenSocketStatus success = mSocket->Open(port);
+        if (success != UDP_OpenSocketStatus::OpenOk)
+        {
+            printf("failed to open UDP socket\n");
+        }
     }
 
     void Close()
@@ -172,12 +176,18 @@ inline void closesocket(TCPSOCKET s)
 
 inline void socketpeeraddr(TCPSOCKET s, IPADDRESS *addr, IPPORT *port)
 {
-    s->GetPeedAddress(addr, port);
+    if (s)
+    {
+        s->GetPeedAddress(addr, port);
+    }
 }
 
 inline void udpsocketclose(UDPSOCKET s)
 {
-    s->Close();
+    if (s)
+    {
+        s->Close();
+    }
 }
 
 inline UDPSOCKET udpsocketcreate(unsigned short portNum)

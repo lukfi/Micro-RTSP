@@ -44,6 +44,7 @@ public:
     TCPSOCKET& getClient() { return m_RtspClient; }
     
     uint16_t getRtpClientPort() { return m_RtpClientPort; }
+
 private:
     void Init();
     bool ParseRtspRequest(char const * aRequest, unsigned aRequestSize);

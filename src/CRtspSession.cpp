@@ -25,6 +25,7 @@ CRtspSession::CRtspSession(WiFiClient& aClient, CStreamer * aStreamer) : LinkedL
 
 CRtspSession::~CRtspSession()
 {
+    printf("Destroying RTSP session\n");
     m_Streamer->ReleaseUdpTransport();
     closesocket(m_RtspClient);
 };
