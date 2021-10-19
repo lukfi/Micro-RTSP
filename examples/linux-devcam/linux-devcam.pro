@@ -14,6 +14,7 @@ HEADERS += \
     ../../src/CStreamer.h \
     ../../src/JPEGSamples.h \
     ../../src/CRtspSession.h \
+    ../../src/JPEGAnalyse.h \
     camerastreamer.h \
     rtspstreamserver.h
 
@@ -23,6 +24,7 @@ SOURCES += \
     ../../src/CStreamer.cpp \
     ../../src/JPEGSamples.cpp \
     ../../src/CRtspSession.cpp \
+    ../../src/JPEGAnalyse.cpp \
     camerastreamer.cpp \
     rtspstreamserver.cpp
 
