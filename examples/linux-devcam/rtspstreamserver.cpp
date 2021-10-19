@@ -36,7 +36,7 @@ void RTSPStreamServer::StreamFrame(const unsigned char *data, uint32_t dataLen, 
 void RTSPStreamServer::StreamFrameThread(const unsigned char *data, uint32_t dataLen, uint32_t curMsec)
 {
     mStreamer->streamFrame(data, dataLen, curMsec);
-    delete[] data;
+    //delete[] data;
 }
 
 void RTSPStreamServer::OnNewClient(LF::net::SocketMaster*, ConnectionSocket* client)

@@ -1,5 +1,7 @@
 #include "camerastreamer.h"
 
+#include <algorithm>
+
 /********** DEBUG SETUP **********/
 #define ENABLE_SDEBUG
 #define DEBUG_PREFIX "CameraStreamer: "
@@ -28,10 +30,9 @@ CameraStreamer::CameraStreamer() :
             ss << f;
             SDEB(">>> %s", ss.str().c_str());
             ++formatId;
-            if ((f.colorspace == LF::graphic::ColorSpace_t::MJPG ||
-                 f.colorspace == LF::graphic::ColorSpace_t::RGB24) &&
-                f.resolution.width == 640 &&
-                f.resolution.height == 480)
+            if (f.colorspace == LF::graphic::ColorSpace_t::MJPG
+//                 || f.colorspace == LF::graphic::ColorSpace_t::RGB24
+                )
             {
                 chosenDeviceId = d.mId;
                 chosenFormatId = formatId;
@@ -76,14 +77,17 @@ void CameraStreamer::streamImage(uint32_t curMsec)
 
         uint32_t len = 0;
 
-    #if M_OS == M_OS_WINDOWS
-        mEncoder.Encode(data, len, mImage);
-        dataToSend = data;
-    #else
-        //image = mImage;
-        dataToSend = mImage.GetNonConstRawData();
-        len = mImage.GetDataSize();
-    #endif
+        if (mImage.GetColorSpace() != LF::graphic::ColorSpace_t::MJPG)
+        {
+            mEncoder.Encode(data, len, mImage);
+            dataToSend = data;
+        }
+        else
+        {
+            dataToSend = mImage.GetNonConstRawData();
+            len = mImage.GetDataSize();
+        }
+
         if (mSink)
         {
             mSink->StreamFrame(dataToSend, len, curMsec);
@@ -110,6 +114,7 @@ bool CameraStreamer::handleRequests(uint32_t readTimeoutMs)
 
 void CameraStreamer::OnNewFrame(LF::video::VideoDevice *device)
 {
+//    SDEB("OnNewFrame");
     if (!anySessionsStreaming())
     {
         mDevice->Stop();
@@ -119,8 +124,29 @@ void CameraStreamer::OnNewFrame(LF::video::VideoDevice *device)
     streamImage(millis());
 }
 
+//#define DEBUG_JPEG
+#ifdef DEBUG_JPEG
+#include "fs/file.h"
+#endif
+
 void CameraStreamer::OnNewJPEGFrame(LF::video::VideoDevice* device)
 {
-    SDEB("OnNewJPEGFrame");
+//    SDEB("OnNewJPEGFrame");
+    if (!anySessionsStreaming())
+    {
+        mDevice->Stop();
+        return;
+    }
     device->GetFrame(mImage);
+#ifdef DEBUG_JPEG
+    static int i = 0;
+    if (i++ == 0)
+    {
+        LF::fs::File f("/home/pi/my.jpeg");
+        f.CreateOpen();
+        f.Put(mImage.GetNonConstRawData(), mImage.GetDataSize());
+        f.Close();
+    }
+#endif
+    streamImage(millis());
 }

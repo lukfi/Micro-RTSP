@@ -5,9 +5,9 @@
 #include "video/videodevice.h"
 #include "threads/iothread.h"
 
-#if M_OS == M_OS_WINDOWS
+//#if M_OS == M_OS_WINDOWS
 #include "graphics/jpeg.h"
-#endif
+//#endif
 
 class CameraStreamer : public CStreamer
 {
@@ -28,9 +28,9 @@ private:
 
     LF::threads::IOThread mCameraThread;
 
-#if M_OS == M_OS_WINDOWS
+//#if M_OS == M_OS_WINDOWS
     LF::graphic::JPEGEncoder mEncoder;
-#endif
+//#endif
 };
 
 #endif // CAMERASTREAMER_H

@@ -81,11 +81,13 @@ int CStreamer::SendRtpPacket(const DecodedImageInfo& info, uint32_t fragmentOffs
 
     // Do we have custom quant tables? If so include them per RFC
 
-    bool includeQuantTbl = info.qTable0 && info.qTable1 && fragmentOffset == 0;
+    bool includeQuantTbl = info.qTable0 /*&& info.qTable1*/ && fragmentOffset == 0;
+    int numOfQuantTbl = includeQuantTbl ? (info.qTable1 ? 2 : 1) : 0;
+
     uint8_t q = includeQuantTbl ? 128 : 0x5e;
 
     static char RtpBuf[2048]; // Note: we assume single threaded, this large buf we keep off of the tiny stack
-    int RtpPacketSize = fragmentLen + KRtpHeaderSize + KJpegHeaderSize + (includeQuantTbl ? (4 + 64 * 2) : 0);
+    int RtpPacketSize = fragmentLen + KRtpHeaderSize + KJpegHeaderSize + (includeQuantTbl ? (4 + 64 * numOfQuantTbl) : 0);
 
     memset(RtpBuf,0x00,sizeof(RtpBuf));
     // Prepare the first 4 byte of the packet. This is the Rtp over Rtsp header in case of TCP based transport
@@ -132,15 +134,18 @@ int CStreamer::SendRtpPacket(const DecodedImageInfo& info, uint32_t fragmentOffs
         RtpBuf[26] = 0; // MSB of lentgh
 
         int numQantBytes = 64; // Two 64 byte tables
-        RtpBuf[27] = 2 * numQantBytes; // LSB of length
+        RtpBuf[27] = numOfQuantTbl * numQantBytes; // LSB of length
 
         headerLen += 4;
 
         memcpy(RtpBuf + headerLen, info.qTable0, numQantBytes);
         headerLen += numQantBytes;
 
-        memcpy(RtpBuf + headerLen, info.qTable1, numQantBytes);
-        headerLen += numQantBytes;
+        if (info.qTable1)
+        {
+            memcpy(RtpBuf + headerLen, info.qTable1, numQantBytes);
+            headerLen += numQantBytes;
+        }
     }
     // printf("Sending timestamp %d, seq %d, fragoff %d, fraglen %d, jpegLen %d\n", m_Timestamp, m_SequenceNumber, fragmentOffset, fragmentLen, jpegLen);
 
@@ -286,9 +291,6 @@ void CStreamer::streamFrame(unsigned const char *data, uint32_t dataLen, uint32_
     uint32_t deltams = (curMsec >= m_prevMsec) ? curMsec - m_prevMsec : 100;
     m_prevMsec = curMsec;
 
-    // locate quant tables if possible
-    BufPtr qtable0, qtable1;
-
     DecodedImageInfo info;
 
     if (!decodeJPEGfile(data, dataLen, info))
@@ -348,7 +350,7 @@ bool findJPEGheader(BufPtr *start, uint32_t *len, uint8_t marker)
         uint8_t framing = *bytes++; // better be 0xff
         if(framing != 0xff)
         {
-            printf("malformed jpeg, framing=%x\n", framing);
+            //printf("malformed jpeg, framing=%x\n", framing);
             return false;
         }
         uint8_t typecode = *bytes++;
@@ -493,14 +495,15 @@ bool decodeJPEGfile(BufPtr start, uint32_t len, DecodedImageInfo &info)
         nextJpegBlock(&quantstart);
         if(!findJPEGheader(&quantstart, &quantlen, 0xdb))
         {
-            printf("error can't find quant table 1\n");
+            //printf("error can't find quant table 1\n");
+            info.qTable1 = nullptr;
         }
         else
         {
             // printf("found quant table %x\n", quantstart[2]);
+            info.qTable1 = quantstart + 3;
+            nextJpegBlock(&quantstart);
         }
-        info.qTable1 = quantstart + 3;
-        nextJpegBlock(&quantstart);
     }
 
     // find Start of Scan (SOS) marker to determine start of
