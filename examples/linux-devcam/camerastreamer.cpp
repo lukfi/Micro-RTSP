@@ -11,36 +11,14 @@
 CameraStreamer::CameraStreamer() :
     CStreamer()
 {
-    int chosenDeviceId = -1;
-    int chosenFormatId = -1;
 
-    auto devices = LF::video::VideoDevice::GetDevicesList();
-
-    int deviceId = -1;
-    for (auto d : devices)
+    int chosenDeviceId;
+    int chosenFormatId;
+    if (!FindDevice(LF::graphic::ColorSpace_t::MJPG, chosenDeviceId, chosenFormatId))
     {
-        SDEB("> %s", d.mName.c_str());
-        ++deviceId;
-
-        int formatId = -1;
-        auto formats = d.mFormats;
-        for (auto f : formats)
-        {
-            std::stringstream ss;
-            ss << f;
-            SDEB(">>> %s", ss.str().c_str());
-            ++formatId;
-            if (f.colorspace == LF::graphic::ColorSpace_t::MJPG
-//                 || f.colorspace == LF::graphic::ColorSpace_t::RGB24
-                )
-            {
-                chosenDeviceId = d.mId;
-                chosenFormatId = formatId;
-                break;
-            }
-        }
-        if (chosenDeviceId != -1) break;
+        FindDevice(LF::graphic::ColorSpace_t::RGB24, chosenDeviceId, chosenFormatId);
     }
+
     if (chosenDeviceId != -1 && chosenFormatId != -1)
     {
         SDEB("Opening device %d format %d", chosenDeviceId, chosenFormatId);
@@ -110,6 +88,39 @@ bool CameraStreamer::handleRequests(uint32_t readTimeoutMs)
     }
 
     return ret;
+}
+
+bool CameraStreamer::FindDevice(LF::graphic::ColorSpace_t colorspace, int& device, int& format)
+{
+    device = -1;
+    format = -1;
+
+    auto devices = LF::video::VideoDevice::GetDevicesList();
+
+    int deviceId = -1;
+    for (auto d : devices)
+    {
+        SDEB("> %s", d.mName.c_str());
+        ++deviceId;
+
+        int formatId = -1;
+        auto formats = d.mFormats;
+        for (auto f : formats)
+        {
+            std::stringstream ss;
+            ss << f;
+            SDEB(">>> %s", ss.str().c_str());
+            ++formatId;
+            if (f.colorspace == colorspace)
+            {
+                device = d.mId;
+                format = formatId;
+                break;
+            }
+        }
+        if (device != -1) break;
+    }
+    return device != -1 && format != -1;
 }
 
 void CameraStreamer::OnNewFrame(LF::video::VideoDevice *device)
