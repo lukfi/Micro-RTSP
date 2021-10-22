@@ -62,8 +62,9 @@ void CameraStreamer::streamImage(uint32_t curMsec)
         }
         else
         {
-            dataToSend = mImage.GetNonConstRawData();
             len = mImage.GetDataSize();
+            dataToSend = new uint8_t[len];
+            memcpy(dataToSend, mImage.GetNonConstRawData(), len);
         }
 
         if (mSink)
