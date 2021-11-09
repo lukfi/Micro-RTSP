@@ -293,11 +293,17 @@ void CStreamer::streamFrame(unsigned const char *data, uint32_t dataLen, uint32_
 
     DecodedImageInfo info;
 
+    mMetrics.DecodeStart();
+
     if (!decodeJPEGfile(data, dataLen, info))
     {
+        mMetrics.DecodeStop();
         printf("can't decode jpeg data\n");
         return;
     }
+
+    mMetrics.DecodeStop();
+
 //    printf("Decoded image %dx%d, q0: %p, q1: %p, type: %d, payload size: %d, %p\n",
 //           info.width, info.height, info.qTable0, info.qTable1, info.type, info.payloadLen, info.jpegPayload);
 
@@ -320,3 +326,67 @@ void CStreamer::streamFrame(unsigned const char *data, uint32_t dataLen, uint32_
     if (m_SendIdx > 1) m_SendIdx = 0;
 };
 
+///
+/// STREAMER METRICS
+///
+
+void StreamerMetrics::DecodeStart()
+{
+    mDecodeStartTime = millis();
+    if (mReportTime == 0)
+    {
+        mReportTime = mDecodeStartTime;
+    }
+}
+
+void StreamerMetrics::DecodeStop()
+{
+    uint32_t now = millis();
+    uint32_t timeDiff = now - mDecodeStartTime;
+
+//    printf("diff: %d\n", timeDiff);
+
+    ++jpegDecodeCount;
+    jpegDecodeTimeAcc += timeDiff;
+    if (timeDiff < jpegDecodeTimeMin)
+    {
+        jpegDecodeTimeMin = timeDiff;
+    }
+    if (timeDiff > jpegDecodeTimeMax)
+    {
+        jpegDecodeTimeMax = timeDiff;
+    }
+    mDecodeStartTime = 0;
+
+    if (now - mReportTime >= 1000)
+    {
+        Report(now - mReportTime);
+        mReportTime = now;
+    }
+}
+
+void StreamerMetrics::Report(uint32_t timeDiff)
+{
+    float fps = jpegDecodeCount;
+    float t = (timeDiff / 1000);
+    fps /= t;
+    printf("\n-------------------------\n");
+    printf("Report (%d)\n", timeDiff);
+    printf("-------------------------\n");
+    printf("fps: %.1f\n", fps);
+    printf("ava: %d\n", jpegDecodeTimeAcc / jpegDecodeCount);
+    printf("max: %d\n", jpegDecodeTimeMax);
+    printf("min: %d\n", jpegDecodeTimeMin);
+
+    Reset();
+}
+
+void StreamerMetrics::Reset()
+{
+    mDecodeStartTime = 0;
+    jpegDecodeCount = 0;
+    jpegDecodeTimeAcc = 0;
+    jpegDecodeTimeMin = 0xffffffff;
+    jpegDecodeTimeMax = 0;
+
+}

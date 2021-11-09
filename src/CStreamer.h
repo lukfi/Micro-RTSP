@@ -13,6 +13,25 @@ public:
     virtual void StreamFrame(unsigned const char *data, uint32_t dataLen, uint32_t curMsec) = 0;
 };
 
+class StreamerMetrics
+{
+public:
+    void DecodeStart();
+    void DecodeStop();
+
+    void Report(uint32_t dimeDiff);
+private:
+    void Reset();
+
+    uint32_t mDecodeStartTime { 0 };
+    uint32_t jpegDecodeCount { 0 };
+    uint32_t jpegDecodeTimeAcc { 0 };
+    uint32_t jpegDecodeTimeMin { 0xffffffff };
+    uint32_t jpegDecodeTimeMax { 0 };
+
+    uint32_t mReportTime;
+};
+
 class CStreamer
 {
 public:
@@ -61,5 +80,7 @@ private:
     uint32_t m_prevMsec;
 
     int m_udpRefCount;
+
+    StreamerMetrics mMetrics;
 };
 
